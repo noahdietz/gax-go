@@ -30,6 +30,7 @@
 package gax
 
 import (
+	"net/http"
 	"testing"
 	"time"
 
@@ -83,6 +84,25 @@ func TestOnCodes(t *testing.T) {
 		b := OnCodes(tst.c, Backoff{})
 		if _, retry := b.Retry(apiErr); retry != tst.retry {
 			t.Errorf("retriable codes: %v, error: %s, retry: %t, want %t", tst.c, apiErr, retry, tst.retry)
+		}
+	}
+}
+
+func TestOnHttpCodes(t *testing.T) {
+	apiErr := HttpStatus(http.StatusGatewayTimeout)
+	tests := []struct {
+		st    []int
+		retry bool
+	}{
+		{nil, false},
+		{[]int{http.StatusBadGateway}, false},
+		{[]int{http.StatusGatewayTimeout, http.StatusBadGateway}, true},
+		{[]int{http.StatusGatewayTimeout}, true},
+	}
+	for _, tst := range tests {
+		b := OnHttpCodes(tst.st, Backoff{})
+		if _, retry := b.Retry(apiErr); retry != tst.retry {
+			t.Errorf("retriable codes: %v, error: %s, retry: %t, want %t", tst.st, apiErr, retry, tst.retry)
 		}
 	}
 }

@@ -30,6 +30,7 @@
 package gax
 
 import (
+	"fmt"
 	"math/rand"
 	"time"
 
@@ -82,6 +83,42 @@ type boRetryer struct {
 
 func (r *boRetryer) Retry(err error) (time.Duration, bool) {
 	st, ok := status.FromError(err)
+	if !ok {
+		return 0, false
+	}
+	c := st.Code()
+	for _, rc := range r.codes {
+		if c == rc {
+			return r.backoff.Pause(), true
+		}
+	}
+	return 0, false
+}
+
+type HttpStatus int
+
+func (s HttpStatus) Error() string {
+	return fmt.Sprintf("error code: %d", s)
+}
+
+func (s HttpStatus) Code() int {
+	return int(s)
+}
+
+func OnHttpCodes(st []int, bo Backoff) Retryer {
+	return &boHttpRetryer{
+		backoff: bo,
+		codes:   append([]int(nil), st...),
+	}
+}
+
+type boHttpRetryer struct {
+	backoff Backoff
+	codes   []int
+}
+
+func (r *boHttpRetryer) Retry(err error) (time.Duration, bool) {
+	st, ok := err.(HttpStatus)
 	if !ok {
 		return 0, false
 	}
