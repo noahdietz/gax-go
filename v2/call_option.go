@@ -63,6 +63,32 @@ func WithRetry(fn func() Retryer) CallOption {
 	return retryerOption(fn)
 }
 
+func OnHTTPStatuses(sts []int, bo Backoff) Retryer {
+	return &boHTTPRetyer{
+		backoff:  bo,
+		statuses: sts,
+	}
+}
+
+type boHTTPRetyer struct {
+	backoff  Backoff
+	statuses []int
+}
+
+func (r *boHTTPRetyer) Retry(err error) (time.Duration, bool) {
+	ae, ok := FromError(err)
+	if !ok {
+		return 0, false
+	}
+	s := ae.httpStatus
+	for _, rs := range r.statuses {
+		if s == rs {
+			return r.backoff.Pause(), true
+		}
+	}
+	return 0, false
+}
+
 // OnCodes returns a Retryer that retries if and only if
 // the previous attempt returns a GRPC error whose error code is stored in cc.
 // Pause times between retries are specified by bo.

@@ -31,6 +31,7 @@ package gax
 
 import (
 	"fmt"
+	"net/http"
 
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/status"
@@ -52,9 +53,10 @@ type APIError struct {
 	// I don't like this.
 	details *details
 
-	err    error
-	status *status.Status
-	// Could expand to HTTP errors as well...
+	err        error
+	status     *status.Status
+	httpStatus int
+	httpReason string
 }
 
 // TODO: I don't like this
@@ -127,6 +129,9 @@ func (a *APIError) GRPCStatus() *status.Status {
 // returned. If present, the error details are parsed into the APIError. If
 // err is nil or it is not an API call status, nil and false are returned.
 func FromError(err error) (*APIError, bool) {
+	if ae, ok := err.(*APIError); ok {
+		return ae, ok
+	}
 	if st, ok := status.FromError(err); ok {
 		return FromStatus(st), true
 	}
@@ -139,5 +144,13 @@ func FromStatus(st *status.Status) *APIError {
 		details: d(st),
 		err:     st.Err(),
 		status:  st,
+	}
+}
+
+func FromHTTPResponse(resp *http.Response) *APIError {
+	return &APIError{
+		httpStatus: resp.StatusCode,
+		httpReason: resp.Status,
+		// Parse details from body? Or trailer? idk where it is.
 	}
 }
